@@ -1,0 +1,47 @@
+const { db } = require('../config/firebase');
+
+exports.startTrip = async (req, res) => {
+  try {
+    const { busId, driverId, shift } = req.body;
+    if (!busId || !driverId || !shift) {
+      return res.status(400).json({ success: false, message: 'Missing busId, driverId, or shift' });
+    }
+    const tripsRef = db.collection('trips');
+    const activeQuery = await tripsRef.where('busId', '==', busId).where('status', '==', 'ACTIVE').get();
+    if (!activeQuery.empty) {
+      return res.status(400).json({ success: false, message: 'Trip already active for this bus' });
+    }
+    const newTripRef = tripsRef.doc();
+    const tripData = {
+      tripId: newTripRef.id,
+      busId,
+      driverId,
+      shift,
+      startTime: new Date().toISOString(),
+      endTime: null,
+      status: 'ACTIVE'
+    };
+    await newTripRef.set(tripData);
+    await db.collection('buses').doc(busId).set({ activeTripId: newTripRef.id }, { merge: true });
+    return res.status(201).json({ success: true, data: tripData });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.endTrip = async (req, res) => {
+  try {
+    const { tripId, busId } = req.body;
+    if (!tripId || !busId) {
+      return res.status(400).json({ success: false, message: 'Missing tripId or busId' });
+    }
+    await db.collection('trips').doc(tripId).update({
+      endTime: new Date().toISOString(),
+      status: 'COMPLETED'
+    });
+    await db.collection('buses').doc(busId).update({ activeTripId: null });
+    return res.status(200).json({ success: true, message: 'Trip ended successfully' });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
