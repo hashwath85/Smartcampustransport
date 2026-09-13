@@ -19,19 +19,21 @@ if (fs.existsSync(serviceAccountPath)) {
   messaging = getMessaging();
 } else {
   console.log('?? Running Firebase in Local Mock Mode (No serviceAccountKey.json found)');
-  
-  // Lightweight Firestore mock for local endpoint testing
-  const mockCollection = () => ({
+
+  const mockQuery = {
+    where: () => mockQuery,
+    limit: () => mockQuery,
+    get: async () => ({ empty: true, docs: [] }),
     doc: () => ({
       set: async () => ({ id: 'mock_doc_id' }),
       get: async () => ({ exists: true, data: () => ({}) }),
       update: async () => ({})
     }),
     add: async () => ({ id: 'mock_doc_id' })
-  });
+  };
 
   db = {
-    collection: mockCollection
+    collection: () => mockQuery
   };
 
   messaging = {
