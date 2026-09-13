@@ -1,28 +1,25 @@
-"use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.adminFieldValue = exports.messaging = exports.auth = exports.db = void 0;
-const path_1 = __importDefault(require("path"));
-const dotenv_1 = __importDefault(require("dotenv"));
-const app_1 = require("firebase-admin/app");
-const firestore_1 = require("firebase-admin/firestore");
-const auth_1 = require("firebase-admin/auth");
-const messaging_1 = require("firebase-admin/messaging");
-dotenv_1.default.config();
-const serviceAccountPath = path_1.default.resolve(process.env.FIREBASE_SERVICE_ACCOUNT_PATH || './serviceAccountKey.json');
-let app;
-if ((0, app_1.getApps)().length === 0) {
-    app = (0, app_1.initializeApp)({
-        credential: (0, app_1.cert)(require(serviceAccountPath))
+const { initializeApp, getApps, cert } = require('firebase-admin/app');
+const { getFirestore } = require('firebase-admin/firestore');
+const { getMessaging } = require('firebase-admin/messaging');
+const path = require('path');
+const fs = require('fs');
+require('dotenv').config();
+
+if (getApps().length === 0) {
+  const serviceAccountPath = path.join(__dirname, '../../serviceAccountKey.json');
+  
+  if (fs.existsSync(serviceAccountPath)) {
+    const serviceAccount = require(serviceAccountPath);
+    initializeApp({
+      credential: cert(serviceAccount)
     });
+  } else {
+    // Fallback initialization if service account key is not present locally
+    initializeApp();
+  }
 }
-else {
-    app = (0, app_1.getApps)()[0];
-}
-exports.db = (0, firestore_1.getFirestore)(app);
-exports.auth = (0, auth_1.getAuth)(app);
-exports.messaging = (0, messaging_1.getMessaging)(app);
-exports.adminFieldValue = firestore_1.FieldValue;
-//# sourceMappingURL=firebase.js.map
+
+const db = getFirestore();
+const messaging = getMessaging();
+
+module.exports = { db, messaging };
