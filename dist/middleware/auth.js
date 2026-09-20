@@ -1,9 +1,5 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.authenticateUser = void 0;
-const express_1 = require("express");
-const firebase_js_1 = require("../config/firebase.js");
-const authenticateUser = async (req, res, next) => {
+import { auth, db } from '../config/firebase.js';
+export const authenticateUser = async (req, res, next) => {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return res.status(401).json({
@@ -14,9 +10,9 @@ const authenticateUser = async (req, res, next) => {
     }
     const token = authHeader.split('Bearer ')[1];
     try {
-        const decodedToken = await firebase_js_1.auth.verifyIdToken(token);
+        const decodedToken = await auth.verifyIdToken(token);
         // Fetch profile document to grab system role and assignment IDs
-        const userDoc = await firebase_js_1.db.collection('users').doc(decodedToken.uid).get();
+        const userDoc = await db.collection('users').doc(decodedToken.uid).get();
         if (!userDoc.exists) {
             return res.status(403).json({
                 success: false,
@@ -43,5 +39,3 @@ const authenticateUser = async (req, res, next) => {
         });
     }
 };
-exports.authenticateUser = authenticateUser;
-//# sourceMappingURL=auth.js.map

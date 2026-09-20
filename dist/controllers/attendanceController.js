@@ -1,9 +1,5 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.validateQR = void 0;
-const express_1 = require("express");
-const attendance_service_js_1 = require("../services/attendance.service.js");
-const validateQR = async (req, res) => {
+import { validateAndRecordAttendance } from '../services/attendance.service.js';
+export const validateQR = async (req, res) => {
     try {
         const { qrPayload, driverGps } = req.body;
         const driverId = req.user?.driverId || req.user?.uid;
@@ -21,7 +17,7 @@ const validateQR = async (req, res) => {
                 message: 'Driver identity could not be verified from token.'
             });
         }
-        const result = await (0, attendance_service_js_1.validateAndRecordAttendance)({
+        const result = await validateAndRecordAttendance({
             qrPayload,
             driverGps,
             driverId
@@ -40,5 +36,3 @@ const validateQR = async (req, res) => {
         });
     }
 };
-exports.validateQR = validateQR;
-//# sourceMappingURL=attendanceController.js.map

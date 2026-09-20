@@ -1,16 +1,19 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.validateAndRecordAttendance = void 0;
-const firebase_js_1 = require("../config/firebase.js");
-const crypto_js_1 = require("../utils/crypto.js");
-const distance_js_1 = require("../utils/distance.js");
-const validateAndRecordAttendance = async ({ qrPayload, driverGps, driverId }) => {
+import { db, adminFieldValue } from '../config/firebase.js';
+import { verifyQRSignature } from '../utils/crypto.js';
+import { calculateHaversineDistance } from '../utils/distance.js';
+export const validateAndRecordAttendance = async ({ qrPayload, driverGps, driverId }) => {
     // 1. Extract QR Payload
     const parts = qrPayload.split('|');
     if (parts.length !== 4) {
         throw { statusCode: 400, errorCode: 'ERR_INVALID_QR_FORMAT', message: 'Malformed QR payload structure.' };
     }
-    const [studentId, busId, timestampStr, signature] = parts;
+    const studentId = parts[0];
+    const busId = parts[1];
+    const timestampStr = parts[2];
+    const signature = parts[3];
+    if (!studentId || !busId || !timestampStr || !signature) {
+        throw { statusCode: 400, errorCode: 'ERR_INVALID_QR_PAYLOAD', message: 'QR payload contains empty fields.' };
+    }
     const qrTimestamp = parseInt(timestampStr, 10);
     const currentTimestamp = Math.floor(Date.now() / 1000);
     // 2. Timestamp Expiration Check (120 seconds window)
@@ -18,20 +21,20 @@ const validateAndRecordAttendance = async ({ qrPayload, driverGps, driverId }) =
         throw { statusCode: 400, errorCode: 'ERR_QR_EXPIRED', message: 'QR code has expired. Please refresh QR.' };
     }
     // 3. HMAC Cryptographic Verification
-    const isValidSignature = (0, crypto_js_1.verifyQRSignature)(studentId, busId, qrTimestamp, signature);
+    const isValidSignature = verifyQRSignature(studentId, busId, qrTimestamp, signature);
     if (!isValidSignature) {
         throw { statusCode: 403, errorCode: 'ERR_INVALID_SIGNATURE', message: 'Cryptographic signature verification failed.' };
     }
     // Execute Atomic Firestore Transaction
-    return await firebase_js_1.db.runTransaction(async (transaction) => {
+    return await db.runTransaction(async (transaction) => {
         // 4. Student Account Verification
-        const studentRef = firebase_js_1.db.collection('students').doc(studentId);
+        const studentRef = db.collection('students').doc(studentId);
         const studentDoc = await transaction.get(studentRef);
         if (!studentDoc.exists || studentDoc.data()?.accountStatus !== 'ACTIVE') {
             throw { statusCode: 403, errorCode: 'ERR_STUDENT_INACTIVE', message: 'Student account is inactive or non-existent.' };
         }
         // 5. Check Active Bus & Trip ID (Handshake with BE2)
-        const busRef = firebase_js_1.db.collection('buses').doc(busId);
+        const busRef = db.collection('buses').doc(busId);
         const busDoc = await transaction.get(busRef);
         if (!busDoc.exists || !busDoc.data()?.activeTripId) {
             throw { statusCode: 400, errorCode: 'ERR_NO_ACTIVE_TRIP', message: 'Bus is not currently on an active trip shift.' };
@@ -44,15 +47,15 @@ const validateAndRecordAttendance = async ({ qrPayload, driverGps, driverId }) =
         }
         // 6. Geofence Distance Calculation (<= 100 meters)
         const busGps = busData?.lastLocation;
-        if (busGps && busGps.latitude && busGps.longitude) {
-            const distance = (0, distance_js_1.calculateHaversineDistance)(driverGps.latitude, driverGps.longitude, busGps.latitude, busGps.longitude);
+        if (busGps && typeof busGps.latitude === 'number' && typeof busGps.longitude === 'number') {
+            const distance = calculateHaversineDistance(driverGps.latitude, driverGps.longitude, busGps.latitude, busGps.longitude);
             if (distance > 100) {
                 throw { statusCode: 400, errorCode: 'ERR_GEOFENCE_EXCEEDED', message: `Distance mismatch (${Math.round(distance)}m exceeds 100m radius).` };
             }
         }
         // 7. Duplicate Attendance Check for Today's Shift
         const todayStr = new Date().toISOString().split('T')[0];
-        const attendanceRef = firebase_js_1.db.collection('attendance');
+        const attendanceRef = db.collection('attendance');
         const duplicateQuery = await attendanceRef
             .where('studentId', '==', studentId)
             .where('tripId', '==', activeTripId)
@@ -62,7 +65,7 @@ const validateAndRecordAttendance = async ({ qrPayload, driverGps, driverId }) =
             throw { statusCode: 409, errorCode: 'ERR_DUPLICATE_ATTENDANCE', message: 'Attendance already recorded for this trip shift.' };
         }
         // 8. Auto-Fulfill Pending Wait Requests (Handshake with BE2)
-        const waitRequestsRef = firebase_js_1.db.collection('waitRequests');
+        const waitRequestsRef = db.collection('waitRequests');
         const pendingWaitQuery = await waitRequestsRef
             .where('studentId', '==', studentId)
             .where('busId', '==', busId)
@@ -71,7 +74,7 @@ const validateAndRecordAttendance = async ({ qrPayload, driverGps, driverId }) =
         pendingWaitQuery.forEach((doc) => {
             transaction.update(doc.ref, {
                 status: 'FULFILLED',
-                updatedAt: firebase_js_1.adminFieldValue.serverTimestamp()
+                updatedAt: adminFieldValue.serverTimestamp()
             });
         });
         // 9. Write New Attendance Record
@@ -82,7 +85,7 @@ const validateAndRecordAttendance = async ({ qrPayload, driverGps, driverId }) =
             busId,
             tripId: activeTripId,
             date: todayStr,
-            timestamp: firebase_js_1.adminFieldValue.serverTimestamp(),
+            timestamp: adminFieldValue.serverTimestamp(),
             location: driverGps,
             status: 'BOARDED'
         });
@@ -94,5 +97,3 @@ const validateAndRecordAttendance = async ({ qrPayload, driverGps, driverId }) =
         };
     });
 };
-exports.validateAndRecordAttendance = validateAndRecordAttendance;
-//# sourceMappingURL=attendance.service.js.map

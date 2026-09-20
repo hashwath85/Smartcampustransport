@@ -1,7 +1,4 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.calculateHaversineDistance = void 0;
-const calculateHaversineDistance = (lat1, lon1, lat2, lon2) => {
+export const calculateHaversineDistance = (lat1, lon1, lat2, lon2) => {
     const R = 6371e3; // Earth's radius in meters
     const rad = Math.PI / 180;
     const dLat = (lat2 - lat1) * rad;
@@ -12,5 +9,3 @@ const calculateHaversineDistance = (lat1, lon1, lat2, lon2) => {
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c; // Returns distance in meters
 };
-exports.calculateHaversineDistance = calculateHaversineDistance;
-//# sourceMappingURL=distance.js.map
