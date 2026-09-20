@@ -2,10 +2,12 @@
   "name": "smart-campus-transport-backend",
   "version": "3.0.0",
   "description": "Backend engine for Smart Campus Transport System",
-  "main": "src/app.js",
+  "type": "module",
+  "main": "dist/app.js",
   "scripts": {
-    "start": "node src/app.js",
-    "dev": "nodemon src/app.js"
+    "dev": "tsx watch src/app.ts",
+    "build": "tsc",
+    "start": "node dist/app.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
@@ -14,6 +16,10 @@
     "firebase-admin": "^12.1.0"
   },
   "devDependencies": {
-    "nodemon": "^3.1.0"
+    "@types/cors": "^2.8.5",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.10.1",
+    "tsx": "^4.19.0",
+    "typescript": "^5.9.3"
   }
 }

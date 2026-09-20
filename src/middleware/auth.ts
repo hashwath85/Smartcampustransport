@@ -1,7 +1,11 @@
-import { Request, Response, NextFunction } from 'express';
+import type { Request, Response, NextFunction } from 'express';
 import { auth, db } from '../config/firebase.js';
 
-export const authenticateUser = async (req: Request, res: Response, next: NextFunction) => {
+export const authenticateUser = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -16,10 +20,9 @@ export const authenticateUser = async (req: Request, res: Response, next: NextFu
 
   try {
     const decodedToken = await auth.verifyIdToken(token);
-    
-    // Fetch profile document to grab system role and assignment IDs
+
     const userDoc = await db.collection('users').doc(decodedToken.uid).get();
-    
+
     if (!userDoc.exists) {
       return res.status(403).json({
         success: false,

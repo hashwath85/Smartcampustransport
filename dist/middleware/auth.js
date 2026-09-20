@@ -11,7 +11,6 @@ export const authenticateUser = async (req, res, next) => {
     const token = authHeader.split('Bearer ')[1];
     try {
         const decodedToken = await auth.verifyIdToken(token);
-        // Fetch profile document to grab system role and assignment IDs
         const userDoc = await db.collection('users').doc(decodedToken.uid).get();
         if (!userDoc.exists) {
             return res.status(403).json({

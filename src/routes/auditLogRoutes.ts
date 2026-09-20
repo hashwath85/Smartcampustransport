@@ -1,0 +1,18 @@
+import { Router } from 'express';
+import {
+  createAuditLogEntry,
+  getAuditLogs,
+  getAuditLogsByEntity,
+  getAuditLogById
+} from '../controllers/auditLogController.js';
+import { authenticateUser } from '../middleware/auth.js';
+import { validateRoles } from '../middleware/validateRoles.js';
+
+const router = Router();
+
+router.post('/', authenticateUser, validateRoles(['ADMIN']), createAuditLogEntry);
+router.get('/', authenticateUser, validateRoles(['ADMIN']), getAuditLogs);
+router.get('/entity/:entityType/:entityId', authenticateUser, validateRoles(['ADMIN']), getAuditLogsByEntity);
+router.get('/:id', authenticateUser, validateRoles(['ADMIN']), getAuditLogById);
+
+export default router;

@@ -1,80 +1,101 @@
-const { db } = require('../config/firebase');
+import { db } from '../config/firebase.js';
 
-/**
- * Safely extracts document objects from a Firestore query or reference
- * across both Real Firestore QuerySnapshots and Local Mock Mode objects.
- */
-async function fetchDocs(queryOrRef) {
+type ReportFilters = {
+  shift?: string;
+  busId?: string;
+  driverId?: string;
+  studentId?: string;
+  date?: string;
+  startDate?: string;
+  endDate?: string;
+  status?: string;
+  severity?: string;
+  category?: string;
+};
+
+async function fetchDocs<T = Record<string, any>>(queryOrRef: any): Promise<T[]> {
   try {
     const snapshot = await queryOrRef.get();
-    const docs = [];
+    const docs: T[] = [];
+
     if (snapshot.docs && Array.isArray(snapshot.docs)) {
-      snapshot.docs.forEach((doc) => {
+      snapshot.docs.forEach((doc: any) => {
         docs.push(typeof doc.data === 'function' ? doc.data() : doc);
       });
     } else if (typeof snapshot.forEach === 'function') {
-      snapshot.forEach((doc) => {
+      snapshot.forEach((doc: any) => {
         docs.push(typeof doc.data === 'function' ? doc.data() : doc);
       });
     }
+
     return docs;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching collection docs:', error.message);
     return [];
   }
 }
 
-/**
- * 1. Fleet Performance & Punctuality Report
- */
-async function getFleetPerformanceReport(filters = {}) {
+export async function getFleetPerformanceReport(filters: ReportFilters = {}) {
   const { shift, busId, driverId, startDate, endDate } = filters;
 
   const [buses, trips] = await Promise.all([
-    fetchDocs(db.collection('buses')),
-    fetchDocs(db.collection('trips'))
+    fetchDocs<Record<string, any>>(db.collection('buses')),
+    fetchDocs<Record<string, any>>(db.collection('trips'))
   ]);
 
-  // Apply in-memory filters for flexibility
   let filteredTrips = trips;
+
   if (shift) {
-    filteredTrips = filteredTrips.filter((t) => t.shift && t.shift.toUpperCase() === shift.toUpperCase());
+    filteredTrips = filteredTrips.filter(
+      (t) => t.shift && t.shift.toUpperCase() === shift.toUpperCase()
+    );
   }
+
   if (busId) {
     filteredTrips = filteredTrips.filter((t) => t.busId === busId);
   }
+
   if (driverId) {
     filteredTrips = filteredTrips.filter((t) => t.driverId === driverId);
   }
+
   if (startDate) {
-    filteredTrips = filteredTrips.filter((t) => t.startTime && t.startTime >= startDate);
+    filteredTrips = filteredTrips.filter(
+      (t) => t.startTime && t.startTime >= startDate
+    );
   }
+
   if (endDate) {
-    filteredTrips = filteredTrips.filter((t) => t.startTime && t.startTime <= endDate);
+    filteredTrips = filteredTrips.filter(
+      (t) => t.startTime && t.startTime <= endDate
+    );
   }
 
   const totalBuses = buses.length;
-  const activeBuses = buses.filter((b) => b.activeTripId !== null && b.activeTripId !== undefined).length;
+  const activeBuses = buses.filter(
+    (b) => b.activeTripId !== null && b.activeTripId !== undefined
+  ).length;
   const idleBuses = Math.max(0, totalBuses - activeBuses);
 
   const totalTrips = filteredTrips.length;
   const activeTrips = filteredTrips.filter((t) => t.status === 'ACTIVE').length;
-  const completedTrips = filteredTrips.filter((t) => t.status === 'COMPLETED').length;
+  const completedTrips = filteredTrips.filter(
+    (t) => t.status === 'COMPLETED'
+  ).length;
 
-  const shiftBreakdown = {};
+  const shiftBreakdown: Record<string, number> = {};
   let totalDurationMinutes = 0;
   let tripsWithDuration = 0;
 
   filteredTrips.forEach((trip) => {
-    // Shift breakdown
     if (trip.shift) {
       shiftBreakdown[trip.shift] = (shiftBreakdown[trip.shift] || 0) + 1;
     }
 
-    // Average duration for completed trips
     if (trip.startTime && trip.endTime) {
       const start = new Date(trip.startTime).getTime();
       const end = new Date(trip.endTime).getTime();
+
       if (!isNaN(start) && !isNaN(end) && end > start) {
         const durationMinutes = (end - start) / (1000 * 60);
         totalDurationMinutes += durationMinutes;
@@ -83,9 +104,10 @@ async function getFleetPerformanceReport(filters = {}) {
     }
   });
 
-  const averageTripDurationMinutes = tripsWithDuration > 0
-    ? Math.round((totalDurationMinutes / tripsWithDuration) * 10) / 10
-    : 0;
+  const averageTripDurationMinutes =
+    tripsWithDuration > 0
+      ? Math.round((totalDurationMinutes / tripsWithDuration) * 10) / 10
+      : 0;
 
   return {
     reportName: 'Fleet Performance & Punctuality Analytics',
@@ -95,7 +117,10 @@ async function getFleetPerformanceReport(filters = {}) {
       totalBuses,
       activeBuses,
       idleBuses,
-      fleetUtilizationRate: totalBuses > 0 ? `${Math.round((activeBuses / totalBuses) * 100)}%` : '0%',
+      fleetUtilizationRate:
+        totalBuses > 0
+          ? `${Math.round((activeBuses / totalBuses) * 100)}%`
+          : '0%',
       totalTrips,
       activeTrips,
       completedTrips,
@@ -105,18 +130,16 @@ async function getFleetPerformanceReport(filters = {}) {
   };
 }
 
-/**
- * 2. Student Attendance & Boarding Summary
- */
-async function getStudentAttendanceReport(filters = {}) {
+export async function getStudentAttendanceReport(filters: ReportFilters = {}) {
   const { busId, studentId, date, startDate, endDate } = filters;
 
   const [attendanceRecords, waitRequests] = await Promise.all([
-    fetchDocs(db.collection('attendance')),
-    fetchDocs(db.collection('waitRequests'))
+    fetchDocs<Record<string, any>>(db.collection('attendance')),
+    fetchDocs<Record<string, any>>(db.collection('waitRequests'))
   ]);
 
   let filteredAttendance = attendanceRecords;
+
   if (busId) {
     filteredAttendance = filteredAttendance.filter((a) => a.busId === busId);
   }
@@ -127,13 +150,18 @@ async function getStudentAttendanceReport(filters = {}) {
     filteredAttendance = filteredAttendance.filter((a) => a.date === date);
   }
   if (startDate) {
-    filteredAttendance = filteredAttendance.filter((a) => a.date && a.date >= startDate);
+    filteredAttendance = filteredAttendance.filter(
+      (a) => a.date && a.date >= startDate
+    );
   }
   if (endDate) {
-    filteredAttendance = filteredAttendance.filter((a) => a.date && a.date <= endDate);
+    filteredAttendance = filteredAttendance.filter(
+      (a) => a.date && a.date <= endDate
+    );
   }
 
   let filteredWaitRequests = waitRequests;
+
   if (busId) {
     filteredWaitRequests = filteredWaitRequests.filter((w) => w.busId === busId);
   }
@@ -142,10 +170,12 @@ async function getStudentAttendanceReport(filters = {}) {
   }
 
   const totalBoardings = filteredAttendance.length;
-  const uniqueStudents = new Set(filteredAttendance.map((a) => a.studentId).filter(Boolean));
+  const uniqueStudents = new Set(
+    filteredAttendance.map((a) => a.studentId).filter(Boolean)
+  );
 
-  const boardingsByBus = {};
-  const boardingsByDate = {};
+  const boardingsByBus: Record<string, number> = {};
+  const boardingsByDate: Record<string, number> = {};
 
   filteredAttendance.forEach((a) => {
     if (a.busId) {
@@ -157,7 +187,7 @@ async function getStudentAttendanceReport(filters = {}) {
   });
 
   const totalWaitRequests = filteredWaitRequests.length;
-  const waitRequestStatusBreakdown = {
+  const waitRequestStatusBreakdown: Record<string, number> = {
     PENDING: 0,
     ACCEPTED: 0,
     REJECTED: 0,
@@ -173,13 +203,15 @@ async function getStudentAttendanceReport(filters = {}) {
   const fulfilledCount = waitRequestStatusBreakdown.FULFILLED || 0;
   const acceptedCount = (waitRequestStatusBreakdown.ACCEPTED || 0) + fulfilledCount;
 
-  const fulfillmentRate = totalWaitRequests > 0
-    ? `${Math.round((fulfilledCount / totalWaitRequests) * 100)}%`
-    : '0%';
+  const fulfillmentRate =
+    totalWaitRequests > 0
+      ? `${Math.round((fulfilledCount / totalWaitRequests) * 100)}%`
+      : '0%';
 
-  const acceptanceRate = totalWaitRequests > 0
-    ? `${Math.round((acceptedCount / totalWaitRequests) * 100)}%`
-    : '0%';
+  const acceptanceRate =
+    totalWaitRequests > 0
+      ? `${Math.round((acceptedCount / totalWaitRequests) * 100)}%`
+      : '0%';
 
   return {
     reportName: 'Student Attendance & Boarding Analytics',
@@ -198,23 +230,25 @@ async function getStudentAttendanceReport(filters = {}) {
   };
 }
 
-/**
- * 3. Breakdown & Maintenance Analytics
- */
-async function getBreakdownAnalyticsReport(filters = {}) {
+export async function getBreakdownAnalyticsReport(filters: ReportFilters = {}) {
   const { busId, status, severity, startDate, endDate } = filters;
 
-  const breakdowns = await fetchDocs(db.collection('breakdowns'));
+  const breakdowns = await fetchDocs<Record<string, any>>(db.collection('breakdowns'));
 
   let filtered = breakdowns;
+
   if (busId) {
     filtered = filtered.filter((b) => b.busId === busId);
   }
   if (status) {
-    filtered = filtered.filter((b) => b.status && b.status.toUpperCase() === status.toUpperCase());
+    filtered = filtered.filter(
+      (b) => b.status && b.status.toUpperCase() === status.toUpperCase()
+    );
   }
   if (severity) {
-    filtered = filtered.filter((b) => b.severity && b.severity.toUpperCase() === severity.toUpperCase());
+    filtered = filtered.filter(
+      (b) => b.severity && b.severity.toUpperCase() === severity.toUpperCase()
+    );
   }
   if (startDate) {
     filtered = filtered.filter((b) => b.reportedAt && b.reportedAt >= startDate);
@@ -227,10 +261,10 @@ async function getBreakdownAnalyticsReport(filters = {}) {
   const activeBreakdowns = filtered.filter((b) => b.status !== 'RESOLVED').length;
   const resolvedBreakdowns = filtered.filter((b) => b.status === 'RESOLVED').length;
 
-  const statusBreakdown = {};
-  const severityBreakdown = {};
-  const reasonBreakdown = {};
-  const breakdownsByBus = {};
+  const statusBreakdown: Record<string, number> = {};
+  const severityBreakdown: Record<string, number> = {};
+  const reasonBreakdown: Record<string, number> = {};
+  const breakdownsByBus: Record<string, number> = {};
   let totalDelay = 0;
   let delayCount = 0;
 
@@ -253,9 +287,10 @@ async function getBreakdownAnalyticsReport(filters = {}) {
     }
   });
 
-  const averageEstimatedDelayMinutes = delayCount > 0
-    ? Math.round((totalDelay / delayCount) * 10) / 10
-    : 0;
+  const averageEstimatedDelayMinutes =
+    delayCount > 0
+      ? Math.round((totalDelay / delayCount) * 10) / 10
+      : 0;
 
   return {
     reportName: 'Breakdown & Maintenance Analytics',
@@ -265,7 +300,10 @@ async function getBreakdownAnalyticsReport(filters = {}) {
       totalBreakdowns,
       activeBreakdowns,
       resolvedBreakdowns,
-      resolutionRate: totalBreakdowns > 0 ? `${Math.round((resolvedBreakdowns / totalBreakdowns) * 100)}%` : '0%',
+      resolutionRate:
+        totalBreakdowns > 0
+          ? `${Math.round((resolvedBreakdowns / totalBreakdowns) * 100)}%`
+          : '0%',
       averageEstimatedDelayMinutes,
       statusBreakdown,
       severityBreakdown,
@@ -275,23 +313,25 @@ async function getBreakdownAnalyticsReport(filters = {}) {
   };
 }
 
-/**
- * 4. Complaints & Satisfaction Analytics
- */
-async function getComplaintsAnalyticsReport(filters = {}) {
+export async function getComplaintsAnalyticsReport(filters: ReportFilters = {}) {
   const { studentId, status, category, busId, startDate, endDate } = filters;
 
-  const complaints = await fetchDocs(db.collection('complaints'));
+  const complaints = await fetchDocs<Record<string, any>>(db.collection('complaints'));
 
   let filtered = complaints;
+
   if (studentId) {
     filtered = filtered.filter((c) => c.studentId === studentId);
   }
   if (status) {
-    filtered = filtered.filter((c) => c.status && c.status.toUpperCase() === status.toUpperCase());
+    filtered = filtered.filter(
+      (c) => c.status && c.status.toUpperCase() === status.toUpperCase()
+    );
   }
   if (category) {
-    filtered = filtered.filter((c) => c.category && c.category.toUpperCase() === category.toUpperCase());
+    filtered = filtered.filter(
+      (c) => c.category && c.category.toUpperCase() === category.toUpperCase()
+    );
   }
   if (busId) {
     filtered = filtered.filter((c) => c.busId === busId);
@@ -304,13 +344,13 @@ async function getComplaintsAnalyticsReport(filters = {}) {
   }
 
   const totalComplaints = filtered.length;
-  const statusBreakdown = {
+  const statusBreakdown: Record<string, number> = {
     SUBMITTED: 0,
     IN_REVIEW: 0,
     RESOLVED: 0
   };
-  const categoryBreakdown = {};
-  const complaintsByBus = {};
+  const categoryBreakdown: Record<string, number> = {};
+  const complaintsByBus: Record<string, number> = {};
 
   filtered.forEach((c) => {
     if (c.status && statusBreakdown[c.status] !== undefined) {
@@ -318,6 +358,7 @@ async function getComplaintsAnalyticsReport(filters = {}) {
     } else if (c.status) {
       statusBreakdown[c.status] = (statusBreakdown[c.status] || 0) + 1;
     }
+
     if (c.category) {
       categoryBreakdown[c.category] = (categoryBreakdown[c.category] || 0) + 1;
     }
@@ -327,9 +368,10 @@ async function getComplaintsAnalyticsReport(filters = {}) {
   });
 
   const resolvedCount = statusBreakdown.RESOLVED || 0;
-  const resolutionRate = totalComplaints > 0
-    ? `${Math.round((resolvedCount / totalComplaints) * 100)}%`
-    : '0%';
+  const resolutionRate =
+    totalComplaints > 0
+      ? `${Math.round((resolvedCount / totalComplaints) * 100)}%`
+      : '0%';
 
   return {
     reportName: 'Complaints & Student Satisfaction Analytics',
@@ -338,7 +380,8 @@ async function getComplaintsAnalyticsReport(filters = {}) {
     metrics: {
       totalComplaints,
       resolvedComplaints: resolvedCount,
-      pendingComplaints: (statusBreakdown.SUBMITTED || 0) + (statusBreakdown.IN_REVIEW || 0),
+      pendingComplaints:
+        (statusBreakdown.SUBMITTED || 0) + (statusBreakdown.IN_REVIEW || 0),
       resolutionRate,
       statusBreakdown,
       categoryBreakdown,
@@ -347,10 +390,7 @@ async function getComplaintsAnalyticsReport(filters = {}) {
   };
 }
 
-/**
- * 5. Executive Overview Analytics Dashboard
- */
-async function getExecutiveOverviewReport() {
+export async function getExecutiveOverviewReport() {
   const [fleet, attendance, breakdowns, complaints] = await Promise.all([
     getFleetPerformanceReport(),
     getStudentAttendanceReport(),
@@ -388,11 +428,3 @@ async function getExecutiveOverviewReport() {
     }
   };
 }
-
-module.exports = {
-  getFleetPerformanceReport,
-  getStudentAttendanceReport,
-  getBreakdownAnalyticsReport,
-  getComplaintsAnalyticsReport,
-  getExecutiveOverviewReport
-};

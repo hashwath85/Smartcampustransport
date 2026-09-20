@@ -1,15 +1,21 @@
-const reportService = require('../services/reportService');
+import type { Request, Response } from 'express';
+import {
+  getExecutiveOverviewReport,
+  getFleetPerformanceReport,
+  getStudentAttendanceReport,
+  getBreakdownAnalyticsReport,
+  getComplaintsAnalyticsReport
+} from '../services/reportService.js';
 
-// GET /api/v1/reports/overview
-exports.getOverviewReport = async (req, res) => {
+export const getOverviewReport = async (_req: Request, res: Response) => {
   try {
-    const report = await reportService.getExecutiveOverviewReport();
+    const report = await getExecutiveOverviewReport();
     return res.status(200).json({
       success: true,
       message: 'Executive overview report generated successfully',
       data: report
     });
-  } catch (error) {
+  } catch (error: any) {
     return res.status(500).json({
       success: false,
       message: error.message
@@ -17,16 +23,15 @@ exports.getOverviewReport = async (req, res) => {
   }
 };
 
-// GET /api/v1/reports/fleet-performance
-exports.getFleetPerformance = async (req, res) => {
+export const getFleetPerformance = async (req: Request, res: Response) => {
   try {
-    const report = await reportService.getFleetPerformanceReport(req.query);
+    const report = await getFleetPerformanceReport(req.query as Record<string, any>);
     return res.status(200).json({
       success: true,
       message: 'Fleet performance report generated successfully',
       data: report
     });
-  } catch (error) {
+  } catch (error: any) {
     return res.status(500).json({
       success: false,
       message: error.message
@@ -34,16 +39,15 @@ exports.getFleetPerformance = async (req, res) => {
   }
 };
 
-// GET /api/v1/reports/student-attendance
-exports.getStudentAttendance = async (req, res) => {
+export const getStudentAttendance = async (req: Request, res: Response) => {
   try {
-    const report = await reportService.getStudentAttendanceReport(req.query);
+    const report = await getStudentAttendanceReport(req.query as Record<string, any>);
     return res.status(200).json({
       success: true,
       message: 'Student attendance report generated successfully',
       data: report
     });
-  } catch (error) {
+  } catch (error: any) {
     return res.status(500).json({
       success: false,
       message: error.message
@@ -51,16 +55,15 @@ exports.getStudentAttendance = async (req, res) => {
   }
 };
 
-// GET /api/v1/reports/breakdowns
-exports.getBreakdownAnalytics = async (req, res) => {
+export const getBreakdownAnalytics = async (req: Request, res: Response) => {
   try {
-    const report = await reportService.getBreakdownAnalyticsReport(req.query);
+    const report = await getBreakdownAnalyticsReport(req.query as Record<string, any>);
     return res.status(200).json({
       success: true,
       message: 'Breakdown analytics report generated successfully',
       data: report
     });
-  } catch (error) {
+  } catch (error: any) {
     return res.status(500).json({
       success: false,
       message: error.message
@@ -68,16 +71,15 @@ exports.getBreakdownAnalytics = async (req, res) => {
   }
 };
 
-// GET /api/v1/reports/complaints
-exports.getComplaintsAnalytics = async (req, res) => {
+export const getComplaintsAnalytics = async (req: Request, res: Response) => {
   try {
-    const report = await reportService.getComplaintsAnalyticsReport(req.query);
+    const report = await getComplaintsAnalyticsReport(req.query as Record<string, any>);
     return res.status(200).json({
       success: true,
       message: 'Complaints analytics report generated successfully',
       data: report
     });
-  } catch (error) {
+  } catch (error: any) {
     return res.status(500).json({
       success: false,
       message: error.message
